@@ -18,6 +18,10 @@ namespace DotNet.Sample.Controllers
             _logger = logger;
         }
 
+        /***
+         * Sample endpoint to get weather forecast data.
+         * Logs an informational message and a warning message.
+         */
         [HttpGet(Name = "GetWeatherForecast")]
         public IEnumerable<WeatherForecast> Get()
         {
