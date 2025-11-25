@@ -8,10 +8,13 @@ on:
 env:
   APP_NAME: mt3chained-web
   LOGIN_SERVER: acrzjb112425.azurecr.io
+  CLUSTER_NAME: aks-zjb
+  CLUSTER_RESOURCE_GROUP: azure-zjb-rg
+  NAMESPACE: default
 
 jobs:
 
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
     
@@ -36,3 +39,23 @@ jobs:
           tags: |
             ${{ env.LOGIN_SERVER }}/${{ env.APP_NAME }}:${{ github.run_number }}
             ${{ env.LOGIN_SERVER }}/${{ env.APP_NAME }}:latest
+
+      # 设置目标 Azure Kubernetes 服务 (AKS) 集群。 
+      - uses: azure/aks-set-context@v1
+        with:
+          creds: '${{ secrets.AZURE_CREDENTIALS }}'
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          resource-group: ${{ env.CLUSTER_RESOURCE_GROUP }}
+
+      # 如果不存在，则创建命名空间
+      - run: |
+          kubectl create namespace ${{ env.NAMESPACE }} --dry-run -o json | kubectl apply -f -
+      # 部署应用到 AKS
+      - uses: azure/k8s-deploy@v1
+        with:
+          manifests: |
+            k8s-deployment.yaml
+            k8s-service.yaml
+          images: |
+            ${{ env.LOGIN_SERVER }}/${{ env.APP_NAME }}:${{ github.run_number }}
+          namespace: ${{ env.NAMESPACE }}
