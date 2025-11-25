@@ -35,4 +35,4 @@ jobs:
           push: true
           tags: |
             ${{ env.LOGIN_SERVER }}/${{ env.APP_NAME }}:${{ github.run_number }}
-          ## <latestTag> ##
+            ${{ env.LOGIN_SERVER }}/${{ env.APP_NAME }}:latest
