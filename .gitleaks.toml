@@ -1,0 +1,9 @@
+[allowlist]
+regexTarget = "line"
+regexes = [
+  '''client_id''',
+  '''secret_name''',
+]
+paths = [
+  '''(.*?)vs(.*?)'''
+]

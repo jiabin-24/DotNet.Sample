@@ -7,6 +7,7 @@
     <UserSecretsId>0526c997-8381-4a53-b7ca-32ac79e286e9</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <ApplicationInsightsResourceId>/subscriptions/20c2ec34-c954-4b17-83ce-ffb7bae3146e/resourceGroups/app-dev/providers/microsoft.insights/components/netSample</ApplicationInsightsResourceId>
+	  <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 
 namespace DotNet.Sample.Controllers
 {
@@ -7,22 +8,20 @@ namespace DotNet.Sample.Controllers
     [Route("/")]
     public class HomeController : ControllerBase
     {
-        private readonly ILogger<HomeController> _logger;
-
-        public HomeController(ILogger<HomeController> logger)
-        {
-            _logger = logger;
-        }
+        private static readonly HttpClient _httpClient = new HttpClient();
 
         [HttpGet]
-        [AllowAnonymous]
-        public string Index()
+        public async Task<IActionResult> Get()
         {
-            string instanceId = Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID") ?? "null";
-
-            _logger.LogInformation("Home page accessed at {Time}", DateTime.Now);
-
-            return $"Welcome to the DotNet Sample Application! - with Instance ID {instanceId}";
+            try
+            {
+                var content = await _httpClient.GetStringAsync("https://niuai-app-dev-apim.azure-api.net/WeatherForecast");
+                return Ok(new { echoed = content });
+            }
+            catch (HttpRequestException ex)
+            {
+                return StatusCode(502, new { error = ex.Message });
+            }
         }
     }
 }
