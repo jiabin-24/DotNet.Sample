@@ -26,7 +26,6 @@ public static class ResourceManagementCase
 
         try
         {
-            Console.WriteLine("\n--- 错误写法（N+1）---");
             counter.Reset();
             using (var badContext = CreateContext(connectionString, counter))
             {
@@ -46,23 +45,6 @@ public static class ResourceManagementCase
             }
 
             Console.WriteLine($"N+1 场景 SQL 条数：{counter.CommandCount}");
-
-            Console.WriteLine("\n--- 正确写法（Include 预加载）---");
-            counter.Reset();
-            using (var goodContext = CreateContext(connectionString, counter))
-            {
-                var orders = goodContext.Orders
-                    .Include(o => o.Items)
-                    .AsNoTracking()
-                    .ToList();
-
-                foreach (var order in orders)
-                {
-                    Console.WriteLine($"订单 {order.Id}，商品数：{order.Items.Count}");
-                }
-            }
-
-            Console.WriteLine($"优化后 SQL 条数：{counter.CommandCount}");
         }
         catch (Exception ex)
         {

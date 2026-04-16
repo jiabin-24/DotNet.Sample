@@ -6,18 +6,23 @@ public static class CodeStructureAndReadabilityCase
     {
         Console.WriteLine("\n[1] 示例一");
 
-        var badResult = Calc(12, 3, true, false, true);
+        var badResult = CalculateAdjustedPrice(12, 3, true, false, true);
 
         Console.WriteLine($"输出结果: {badResult:F2}");
     }
 
-    private static decimal Calc(decimal a, decimal b, bool c, bool d, bool e)
+    private static decimal CalculateAdjustedPrice(
+        decimal basePrice,
+        decimal discountAmount,
+        bool applyDiscount,
+        bool applyFee,
+        bool applyTax)
     {
-        var x = a;
-        if (c) x -= b;
-        if (d) x -= 2;
-        if (e) x *= 0.9m;
-        return x < 0 ? 0 : x;
+        var adjustedPrice = basePrice;
+        if (applyDiscount) adjustedPrice -= discountAmount;
+        if (applyFee) adjustedPrice -= 2;
+        if (applyTax) adjustedPrice *= 0.9m;
+        return adjustedPrice < 0 ? 0 : adjustedPrice;
     }
 
 }
