@@ -18,9 +18,16 @@ namespace DotNet.Sample.Controllers
             _logger = logger;
         }
 
+        /***
+         * Sample endpoint to get weather forecast data.
+         * Logs an informational message and a warning message.
+         */
         [HttpGet(Name = "GetWeatherForecast")]
         public IEnumerable<WeatherForecast> Get()
         {
+            _logger.LogInformation("Getting weather forecast at {Time}", DateTime.Now);
+            _logger.LogWarning("An example of a Warning trace..");
+
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {
                 Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
