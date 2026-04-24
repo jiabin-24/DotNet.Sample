@@ -1,0 +1,10 @@
+import { test, expect } from '@playwright/test';
+
+test('test', async ({ page }) => {
+  await page.goto('https://cn.bing.com/');
+  await page.getByRole('searchbox', { name: 'Enter your search term' }).click();
+  await page.getByRole('link', { name: 'Sign in Sign in' }).click();
+  await page.goto('https://login.live.com/oauth20_authorize.srf?client_id=077c9b95-2f57-4442-8872-134fcc08fcb3&scope=openid+profile+email+offline_access&redirect_uri=https%3a%2f%2fcn.bing.com%2fidentity%2fidtokenv2&response_type=code&state=CfDJ8IykvUS-IVVNrph3fqYz1xK6uE0HfstRJRFETw10YuZCUBuX3-Sx1HJzncMuewKb3kcJYPIAbOcx8u_BSrWtvil0sLtVTfRuklmcNJsZ16Oai0y7Gg2E5iuvjtLAR0VnAQfaOUPua7NE3TYj4V6DvB6MdrDWvpW2_jv5fPmjaXgZZpystZwl3KOefJIyXhICt2Y88_MJJyIq-DQsSJYzZr-lFMNt1ndRLQ_Yt0POFdgJPF4OoVu0i-G8k15ZT6tqm7e6AKTlr1JU59qWn5p6R7E-_dYIJe5DiWJNHK9Sh6PKVA4S5JRjsiQTIC-gYI20nsGPpFK8x7VwD9ojhKF2ljKIbFZCl-q3dz-FpZ0kKBP1w6fo5MlioxBthhSiOwWYpcg8B5VvP4A3iZ282NTYPopi_x3K8E4eoMlW7lN20eUkbq694dRIX2JmyZXZjduHdJan1G19Ez5XOL0P3OVcTnxkDHlsclqnro6VEBjleCJNDzjFrB7JKpkKuhy4l2V2Rg&response_mode=form_post&nonce=639125239014993179.ZjhmNzRhYzYtM2E3OS00MTI0LTllYTktODIzODE5ZjZkNGQwMzU2NjQ2ODktZTcyZS00YTcxLWFiMjctYTdkNTM3MjkxMzc5&code_challenge=_JV9QT5MaNdUaPcX-S1ZAf6YUmMd6evRaPiFP_AuLWw&code_challenge_method=S256&x-client-SKU=ID_NET10_0&x-client-Ver=8.15.0.0&uaid=6ce42bd83fa14360ab6c0f1db56ec0f9&msproxy=1&issuer=mso&tenant=consumers&ui_locales=en-US&client_info=1&epctrc=IClOMPZb8FQhKnHL8%2bkCyhFssdk5vhPYST4WFvoaC94%3d3%3a1%3aCANARY%3aDgm%2b9tY3qHd8fe%2bG8A3Vt1RU3LayfYKKSx%2bAE9WErPE%3d&epct=PAQABDgEAAACvnsHKEvvRQb3Bz3Qc7wnaRXZvU3RzQXJ0aWZhY3RzCAAAAAAAOh6wbImolIlH5O3NMyHFy2GqzUn4Ivsc5vD10zcY2jiaAWhU3NAGu9VXIyf3-yHTUOengkLDuNtIg7zSYxNu3vT7UzbSVp4fw4wCKC6TNstSYFA-qsJB-2qJ2uocoUcexOye1_gLz3o9135pTEn4YShM3AyiZsuTbUjNwbExjFvHJ-JUJBXC4XlWyo5a9HY1AXpZiNa9JI5EDn-WbftOPiAA&jshs=0#');
+  await page.getByRole('textbox', { name: 'Email or phone number' }).click();
+  await expect(page.locator('label')).toContainText('Email or phone number');
+});
