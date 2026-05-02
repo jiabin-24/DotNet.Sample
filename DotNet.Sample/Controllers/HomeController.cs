@@ -1,27 +1,15 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 ﻿using Microsoft.AspNetCore.Mvc;
 
 namespace DotNet.Sample.Controllers
 {
     [ApiController]
-    [Route("/")]
+    [Route("[controller]")]
     public class HomeController : ControllerBase
     {
-        private static readonly HttpClient _httpClient = new HttpClient();
-
-        [HttpGet]
+        [HttpGet(Name = "Home")]
         public async Task<IActionResult> Get()
         {
-            try
-            {
-                var content = await _httpClient.GetStringAsync("https://niuai-app-dev-apim.azure-api.net/WeatherForecast");
-                return Ok(new { echoed = content });
-            }
-            catch (HttpRequestException ex)
-            {
-                return StatusCode(502, new { error = ex.Message });
-            }
+            return Ok($"Hello World!");
         }
     }
 }
