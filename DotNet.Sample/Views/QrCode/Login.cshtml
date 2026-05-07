@@ -101,19 +101,31 @@
             color: var(--danger);
             background: #fef2f2;
         }
+
+        .hint {
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--muted);
+            word-break: break-all;
+        }
+
+        .hint a {
+            color: #0ea5e9;
+        }
     </style>
 </head>
 <body>
     <div class="overlay">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="title">
             <h1 id="title" class="title">扫码登录</h1>
-            <p class="desc">请使用移动端扫码确认，确认后当前页面会自动进入登录状态。</p>
+            <p class="desc">请使用 Teams 移动端（或系统扫码器）扫码，完成 Microsoft 账号登录后，当前页面会自动进入登录状态。</p>
 
             <div class="qr-wrap">
                 <img src="data:image/png;base64,@Model.QrCodeBase64" alt="登录二维码" />
             </div>
 
             <div id="status" class="status">等待移动端扫码确认...</div>
+            <p class="hint">若扫码器不支持自动跳转，可手动打开链接：<a href="@Model.MobileUrl" target="_blank" rel="noopener noreferrer">@Model.MobileUrl</a></p>
         </section>
     </div>
 
@@ -153,6 +165,11 @@
 
                 if (data.status === "invalid") {
                     setStatus("登录态无效，请刷新页面重试。", "error");
+                    return;
+                }
+
+                if (data.status === "failed") {
+                    setStatus(data.message || "移动端登录失败，请刷新后重试。", "error");
                     return;
                 }
 

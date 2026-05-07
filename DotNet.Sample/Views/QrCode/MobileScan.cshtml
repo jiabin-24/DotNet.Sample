@@ -5,7 +5,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>移动端扫码确认</title>
+    <title>Teams 扫码登录</title>
     <style>
         body {
             margin: 0;
@@ -19,11 +19,13 @@
         }
 
         .card {
-            width: min(440px, 94vw);
+            width: 100%;
+            max-width: 440px;
             background: #ffffff;
             border-radius: 14px;
             box-shadow: 0 12px 30px rgba(124, 45, 18, 0.14);
             padding: 22px;
+            box-sizing: border-box;
         }
 
         h1 {
@@ -37,18 +39,12 @@
             color: #9a3412;
         }
 
-        input {
+        .button {
             width: 100%;
             box-sizing: border-box;
-            border: 1px solid #fed7aa;
-            border-radius: 10px;
-            padding: 10px 12px;
-            margin-bottom: 14px;
-            font-size: 16px;
-        }
-
-        button {
-            width: 100%;
+            display: block;
+            text-align: center;
+            text-decoration: none;
             border: 0;
             border-radius: 10px;
             padding: 12px;
@@ -57,18 +53,28 @@
             background: #ea580c;
             color: #fff;
         }
+
+        .tip {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #9a3412;
+        }
     </style>
 </head>
 <body>
     <section class="card">
-        <h1>确认登录</h1>
-        <p>该二维码将在 @Model.ExpiresAt 前有效。点击确认后，桌面端会自动进入登录状态。</p>
+        <h1>Teams 扫码登录</h1>
+        <p>二维码有效期至 @Model.ExpiresAt。点击下方按钮进入 Microsoft 登录，成功后返回桌面端即可自动登录。</p>
 
-        <form method="post" action="/QrCode/mobile-confirm">
-            <input type="hidden" name="token" value="@Model.Token" />
-            <input type="text" name="userName" placeholder="输入用户名（可选）" />
-            <button type="submit">确认在此设备登录</button>
-        </form>
+        <a class="button" href="@Model.AuthorizeUrl">继续到 Microsoft 登录</a>
+        <p class="tip">页面会在 1 秒后自动跳转。如果未跳转，请手动点击按钮。</p>
     </section>
+
+    <script>
+        const authorizeUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AuthorizeUrl));
+        setTimeout(function () {
+            window.location.href = authorizeUrl;
+        }, 1000);
+    </script>
 </body>
 </html>
