@@ -1,0 +1,169 @@
+@model DotNet.Sample.Controllers.QrCodeLoginViewModel
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>二维码登录</title>
+    <style>
+        :root {
+            --bg-1: #f8fafc;
+            --bg-2: #dbeafe;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #475569;
+            --ok: #0f766e;
+            --danger: #b91c1c;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at 20% 20%, var(--bg-2), var(--bg-1) 60%);
+            display: grid;
+            place-items: center;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.35);
+            display: grid;
+            place-items: center;
+            padding: 16px;
+        }
+
+        .modal {
+            width: min(420px, 92vw);
+            border-radius: 16px;
+            background: var(--card);
+            box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+            padding: 20px;
+            animation: enter 0.35s ease;
+        }
+
+        @@keyframes enter {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 8px;
+        }
+
+        .desc {
+            margin: 0 0 16px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .qr-wrap {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            display: grid;
+            place-items: center;
+            background: #fff;
+        }
+
+        .qr-wrap img {
+            width: min(280px, 70vw);
+            height: auto;
+            display: block;
+        }
+
+        .status {
+            margin-top: 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #f1f5f9;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .ok {
+            color: var(--ok);
+            background: #ecfeff;
+        }
+
+        .error {
+            color: var(--danger);
+            background: #fef2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="title">
+            <h1 id="title" class="title">扫码登录</h1>
+            <p class="desc">请使用移动端扫码确认，确认后当前页面会自动进入登录状态。</p>
+
+            <div class="qr-wrap">
+                <img src="data:image/png;base64,@Model.QrCodeBase64" alt="登录二维码" />
+            </div>
+
+            <div id="status" class="status">等待移动端扫码确认...</div>
+        </section>
+    </div>
+
+    <script>
+        const token = "@Model.Token";
+        const expiresAt = @Model.ExpiresAtUnix;
+        const statusEl = document.getElementById("status");
+
+        function setStatus(text, cls) {
+            statusEl.textContent = text;
+            statusEl.className = "status " + (cls || "");
+        }
+
+        async function poll() {
+            if (Date.now() > expiresAt) {
+                setStatus("二维码已过期，请刷新页面重试。", "error");
+                return;
+            }
+
+            try {
+                const resp = await fetch(`/QrCode/poll?token=${encodeURIComponent(token)}`, {
+                    method: "GET",
+                    credentials: "include"
+                });
+                const data = await resp.json();
+
+                if (data.status === "authenticated") {
+                    setStatus("登录成功，正在跳转...", "ok");
+                    window.location.href = data.redirectUrl || "/QrCode/profile";
+                    return;
+                }
+
+                if (data.status === "expired") {
+                    setStatus("二维码已过期，请刷新页面重试。", "error");
+                    return;
+                }
+
+                if (data.status === "invalid") {
+                    setStatus("登录态无效，请刷新页面重试。", "error");
+                    return;
+                }
+
+                setTimeout(poll, 1500);
+            } catch {
+                setStatus("网络异常，正在重试...", "error");
+                setTimeout(poll, 2000);
+            }
+        }
+
+        poll();
+    </script>
+</body>
+</html>

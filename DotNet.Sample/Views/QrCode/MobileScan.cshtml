@@ -1,0 +1,74 @@
+@model DotNet.Sample.Controllers.MobileScanViewModel
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>移动端扫码确认</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 100%);
+            color: #7c2d12;
+            display: grid;
+            place-items: center;
+            padding: 16px;
+        }
+
+        .card {
+            width: min(440px, 94vw);
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 12px 30px rgba(124, 45, 18, 0.14);
+            padding: 22px;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 24px;
+        }
+
+        p {
+            margin: 0 0 16px;
+            line-height: 1.6;
+            color: #9a3412;
+        }
+
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #fed7aa;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            border: 0;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            background: #ea580c;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <section class="card">
+        <h1>确认登录</h1>
+        <p>该二维码将在 @Model.ExpiresAt 前有效。点击确认后，桌面端会自动进入登录状态。</p>
+
+        <form method="post" action="/QrCode/mobile-confirm">
+            <input type="hidden" name="token" value="@Model.Token" />
+            <input type="text" name="userName" placeholder="输入用户名（可选）" />
+            <button type="submit">确认在此设备登录</button>
+        </form>
+    </section>
+</body>
+</html>

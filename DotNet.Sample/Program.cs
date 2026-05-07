@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Logging.ApplicationInsights;
@@ -7,8 +8,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddControllersWithViews();
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
     .AddJwtBearer(options =>
     {
         var azureAdSection = builder.Configuration.GetSection("AzureAd");
@@ -33,6 +38,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             $"https://sts.windows.net/{tenantId.TrimEnd('/')}/",
             $"https://login.microsoftonline.com/{tenantId.TrimEnd('/')}/v2.0"
         };
+    })
+    .AddCookie("QrCookie", options =>
+    {
+        options.Cookie.Name = "qr-login";
+        options.LoginPath = "/QrCode/login";
+        options.AccessDeniedPath = "/QrCode/login";
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        options.SlidingExpiration = true;
     });
 
 builder.Services.AddAuthorization();
@@ -92,10 +105,13 @@ if (app.Environment.IsDevelopment() || true)
 
 app.UseHttpsRedirection();
 
+app.UseStaticFiles();
+
 app.UseAuthentication();
 
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDefaultControllerRoute();
 
 app.Run();
