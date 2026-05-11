@@ -4,7 +4,6 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -19,6 +18,7 @@ public class QrCodeController : Controller
     private static readonly ConcurrentDictionary<string, QrLoginSession> Sessions = new();
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromMinutes(3);
     private readonly AzureAdSettings _azureAd;
+    private readonly string _qrCodeHost;
     private readonly IConfigurationManager<OpenIdConnectConfiguration> _configManager;
 
     public QrCodeController(IConfiguration configuration)
@@ -28,8 +28,11 @@ public class QrCodeController : Controller
         {
             Instance = section["Instance"] ?? throw new InvalidOperationException("AzureAd:Instance is not configured."),
             TenantId = section["TenantId"] ?? throw new InvalidOperationException("AzureAd:TenantId is not configured."),
-            ClientId = section["ClientId"] ?? throw new InvalidOperationException("AzureAd:ClientId is not configured.")
+            ClientId = section["ClientId"] ?? throw new InvalidOperationException("AzureAd:ClientId is not configured."),
+            Audience = section["Audience"]
         };
+
+        _qrCodeHost = configuration.GetSection("QrCode")["Host"] ?? throw new InvalidOperationException("QrCode:Host is not configured.");
 
         var metadataAddress = $"{_azureAd.Instance.TrimEnd('/')}/{_azureAd.TenantId.TrimEnd('/')}/v2.0/.well-known/openid-configuration";
         _configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
@@ -61,11 +64,10 @@ public class QrCodeController : Controller
         {
             Token = token,
             ExpiresAt = expiresAt,
-            Status = QrLoginStatus.Pending,
-            Nonce = Guid.NewGuid().ToString("N")
+            Status = QrLoginStatus.Pending
         };
 
-        var mobileUrl = $"{Request.Scheme}://local.niuai.cc/QrCode/mobile-scan?token={token}";
+        var mobileUrl = $"{Request.Scheme}://{_qrCodeHost}/QrCode/token-receive?session={token}";
 
         var model = new QrCodeLoginViewModel
         {
@@ -78,77 +80,88 @@ public class QrCodeController : Controller
         return View("Login", model);
     }
 
-    [HttpGet("mobile-scan")]
-    public IActionResult MobileScan([FromQuery] string token)
+    [HttpGet("token-receive")]
+    public async Task<IActionResult> TokenReceive(
+        [FromQuery(Name = "session")] string sessionToken,
+        [FromQuery(Name = "access_token")] string? accessToken,
+        [FromQuery(Name = "token")] string? token)
     {
-        if (string.IsNullOrWhiteSpace(token) || !Sessions.TryGetValue(token, out var session))
-        {
-            return Content("二维码无效或已失效。", "text/plain", Encoding.UTF8);
-        }
-
-        if (session.ExpiresAt <= DateTimeOffset.UtcNow)
-        {
-            Sessions.TryRemove(token, out _);
-            return Content("二维码已过期，请重新发起登录。", "text/plain", Encoding.UTF8);
-        }
-
-        var model = new MobileScanViewModel
-        {
-            Token = token,
-            ExpiresAt = session.ExpiresAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
-            AuthorizeUrl = BuildAuthorizeUrl(token, session.Nonce)
-        };
-
-        return View("MobileScan", model);
+        var upstreamToken = string.IsNullOrWhiteSpace(accessToken) ? token : accessToken;
+        return await CompleteTokenLoginAsync(sessionToken, upstreamToken, null);
     }
 
-    [HttpPost("teams-callback")]
+    [HttpPost("token-receive")]
     [IgnoreAntiforgeryToken]
-    public async Task<IActionResult> TeamsCallback([FromForm] string? state, [FromForm] string? id_token, [FromForm] string? error, [FromForm] string? error_description)
+    public async Task<IActionResult> TokenReceivePost(
+        [FromForm(Name = "session")] string sessionToken,
+        [FromForm(Name = "access_token")] string? accessToken,
+        [FromForm(Name = "token")] string? token,
+        [FromHeader(Name = "Authorization")] string? authorization)
     {
-        if (!string.IsNullOrWhiteSpace(error))
-        {
-            return Content($"Teams/Entra 登录失败: {error}. {error_description}", "text/plain", Encoding.UTF8);
-        }
+        var upstreamToken = string.IsNullOrWhiteSpace(accessToken) ? token : accessToken;
+        return await CompleteTokenLoginAsync(sessionToken, upstreamToken, authorization);
+    }
 
-        if (string.IsNullOrWhiteSpace(state) || !Sessions.TryGetValue(state, out var session))
+
+    private async Task<IActionResult> CompleteTokenLoginAsync(string sessionToken, string? providedToken, string? authorization)
+    {
+        if (string.IsNullOrWhiteSpace(sessionToken) || !Sessions.TryGetValue(sessionToken, out var session))
         {
             return Content("二维码无效或已失效。", "text/plain", Encoding.UTF8);
         }
 
         if (session.ExpiresAt <= DateTimeOffset.UtcNow)
         {
-            Sessions.TryRemove(state, out _);
+            Sessions.TryRemove(sessionToken, out _);
             return Content("二维码已过期，请重新发起登录。", "text/plain", Encoding.UTF8);
         }
 
-        if (string.IsNullOrWhiteSpace(id_token))
+        var upstreamToken = ResolveIncomingToken(providedToken, authorization);
+        if (string.IsNullOrWhiteSpace(upstreamToken))
         {
             session.Status = QrLoginStatus.Failed;
-            session.ErrorMessage = "未收到 id_token，无法完成登录。";
-            return Content("登录回调缺少 id_token。", "text/plain", Encoding.UTF8);
+            session.ErrorMessage = "未收到 token。";
+            return Content("缺少 token。请通过 access_token/token 参数或 Authorization: Bearer 传入。", "text/plain", Encoding.UTF8);
         }
 
         try
         {
-            var principal = await ValidateIdTokenAsync(id_token, session.Nonce);
-
+            var principal = await ValidateUpstreamTokenAsync(upstreamToken);
             session.Status = QrLoginStatus.Approved;
             session.UserName =
                 principal.FindFirst("name")?.Value ??
                 principal.FindFirst("preferred_username")?.Value ??
                 principal.FindFirst(ClaimTypes.Email)?.Value ??
-                "TeamsUser";
+                principal.FindFirst(ClaimTypes.Name)?.Value ??
+                "EntraUser";
 
-            var page = "<html><head><meta charset=\"utf-8\" /></head><body style=\"font-family:Segoe UI,Microsoft YaHei,sans-serif;padding:24px;\">Teams 扫码登录成功，请返回桌面端继续。</body></html>";
+            var page = "<html><head><meta charset=\"utf-8\" /></head><body style=\"font-family:Segoe UI,Microsoft YaHei,sans-serif;padding:24px;\">Token 校验成功，桌面端将自动完成登录。</body></html>";
             return Content(page, "text/html", Encoding.UTF8);
         }
         catch (Exception ex)
         {
             session.Status = QrLoginStatus.Failed;
             session.ErrorMessage = ex.Message;
-            return Content($"登录校验失败: {ex.Message}", "text/plain", Encoding.UTF8);
+            return Content($"token 校验失败: {ex.Message}", "text/plain", Encoding.UTF8);
         }
+    }
+
+    private static string? ResolveIncomingToken(string? providedToken, string? authorization)
+    {
+        if (!string.IsNullOrWhiteSpace(providedToken))
+        {
+            return providedToken;
+        }
+
+        if (string.IsNullOrWhiteSpace(authorization))
+        {
+            return null;
+        }
+
+        const string bearer = "Bearer ";
+        return authorization.StartsWith(bearer, StringComparison.OrdinalIgnoreCase)
+            ? authorization[bearer.Length..].Trim()
+            : null;
     }
 
     [HttpGet("poll")]
@@ -238,55 +251,35 @@ public class QrCodeController : Controller
         }
     }
 
-    private string BuildAuthorizeUrl(string state, string nonce)
-    {
-        var redirectUri = Url.ActionLink(nameof(TeamsCallback), values: null, protocol: Request.Scheme, host: Request.Host.ToString())
-            ?? $"{Request.Scheme}://{Request.Host}/QrCode/teams-callback";
-        var authorizeEndpoint = $"{_azureAd.Instance.TrimEnd('/')}/{_azureAd.TenantId.TrimEnd('/')}/oauth2/v2.0/authorize";
-
-        var query = new Dictionary<string, string?>
-        {
-            ["client_id"] = _azureAd.ClientId,
-            ["response_type"] = "id_token",
-            ["redirect_uri"] = redirectUri,
-            ["response_mode"] = "form_post",
-            ["scope"] = "openid profile email",
-            ["state"] = state,
-            ["nonce"] = nonce,
-            ["prompt"] = "select_account"
-        };
-
-        return QueryHelpers.AddQueryString(authorizeEndpoint, query);
-    }
-
-    private async Task<ClaimsPrincipal> ValidateIdTokenAsync(string idToken, string expectedNonce)
+    private async Task<ClaimsPrincipal> ValidateUpstreamTokenAsync(string token)
     {
         var config = await _configManager.GetConfigurationAsync(HttpContext.RequestAborted);
         var handler = new JwtSecurityTokenHandler();
+
+        var audiences = new List<string> { _azureAd.ClientId };
+        if (!string.IsNullOrWhiteSpace(_azureAd.Audience))
+        {
+            audiences.Add(_azureAd.Audience);
+        }
+
         var validationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuers = new[]
             {
                 config.Issuer,
-                $"{_azureAd.Instance.TrimEnd('/')}/{_azureAd.TenantId.TrimEnd('/')}/v2.0"
+                $"{_azureAd.Instance.TrimEnd('/')}/{_azureAd.TenantId.TrimEnd('/')}/v2.0",
+                $"https://sts.windows.net/{_azureAd.TenantId.TrimEnd('/')}/"
             },
             ValidateAudience = true,
-            ValidAudience = _azureAd.ClientId,
+            ValidAudiences = audiences.Distinct(StringComparer.OrdinalIgnoreCase),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(2),
             ValidateIssuerSigningKey = true,
             IssuerSigningKeys = config.SigningKeys
         };
 
-        var principal = handler.ValidateToken(idToken, validationParameters, out _);
-        var nonce = principal.FindFirst("nonce")?.Value;
-        if (!string.Equals(nonce, expectedNonce, StringComparison.Ordinal))
-        {
-            throw new SecurityTokenValidationException("nonce 校验失败。请重新扫码。");
-        }
-
-        return principal;
+        return handler.ValidateToken(token, validationParameters, out _);
     }
 
     private sealed class QrLoginSession
@@ -294,7 +287,6 @@ public class QrCodeController : Controller
         public string Token { get; init; } = string.Empty;
         public DateTimeOffset ExpiresAt { get; init; }
         public QrLoginStatus Status { get; set; }
-        public string Nonce { get; init; } = string.Empty;
         public string? UserName { get; set; }
         public string? ErrorMessage { get; set; }
         public bool DesktopSignedIn { get; set; }
@@ -305,7 +297,9 @@ public class QrCodeController : Controller
         public string Instance { get; init; } = string.Empty;
         public string TenantId { get; init; } = string.Empty;
         public string ClientId { get; init; } = string.Empty;
+        public string? Audience { get; init; }
     }
+
 }
 
 public sealed class QrCodeLoginViewModel
@@ -314,13 +308,6 @@ public sealed class QrCodeLoginViewModel
     public string QrCodeBase64 { get; init; } = string.Empty;
     public long ExpiresAtUnix { get; init; }
     public string MobileUrl { get; init; } = string.Empty;
-}
-
-public sealed class MobileScanViewModel
-{
-    public string Token { get; init; } = string.Empty;
-    public string ExpiresAt { get; init; } = string.Empty;
-    public string AuthorizeUrl { get; init; } = string.Empty;
 }
 
 public enum QrLoginStatus
