@@ -11,5 +11,11 @@ namespace DotNet.Sample.Controllers
         {
             return Ok($"Hello World!");
         }
-    }
+
+        [HttpGet("/", Name = "Index")]
+        public async Task<IActionResult> Index()
+        {
+            return Redirect("/swagger");
+        }
+}
 }
